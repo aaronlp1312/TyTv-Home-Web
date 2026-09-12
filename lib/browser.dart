@@ -81,6 +81,13 @@ class _BrowserScreenState extends State<BrowserScreen> {
             onPressed: () => _controller.goBack(),
           ),
           IconButton(
+  icon: Icon(Icons.web),
+  tooltip: 'Browser',
+  onPressed: () {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => BrowserScreen()));
+  },
+),
+          IconButton(
             icon: Icon(Icons.arrow_forward),
             onPressed: () => _controller.goForward(),
           ),
