@@ -10,7 +10,7 @@ class FavoritesRow extends StatefulWidget {
 }
 
 class _FavoritesRowState extends State<FavoritesRow> {
-  List<String> _pinned = [];
+  List<PinnedItem> _pinned = [];
 
   @override
   void initState() {
@@ -34,10 +34,10 @@ class _FavoritesRowState extends State<FavoritesRow> {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         itemBuilder: (context, index) {
-          final url = _pinned[index];
+          final item = _pinned[index];
           return GestureDetector(
             onTap: () {
-              Navigator.of(context).push(MaterialPageRoute(builder: (_) => BrowserScreen(initialUrl: url)));
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => BrowserScreen(initialUrl: item.url)));
             },
             child: Container(
               width: 320,
@@ -46,16 +46,30 @@ class _FavoritesRowState extends State<FavoritesRow> {
                 borderRadius: BorderRadius.circular(12),
               ),
               padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Icon(Icons.language, size: 48, color: Colors.white),
-                  SizedBox(height: 8),
-                  Text(
-                    url,
-                    style: TextStyle(color: Colors.white, fontSize: 14),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                  _faviconWidget(item.favicon),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          item.title.isNotEmpty ? item.title : item.url,
+                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          item.url,
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -64,6 +78,22 @@ class _FavoritesRowState extends State<FavoritesRow> {
         },
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemCount: _pinned.length,
+      ),
+    );
+  }
+
+  Widget _faviconWidget(String favicon) {
+    if (favicon.isEmpty) {
+      return const Icon(Icons.language, size: 48, color: Colors.white);
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.network(
+        favicon,
+        width: 48,
+        height: 48,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => const Icon(Icons.language, size: 48, color: Colors.white),
       ),
     );
   }
