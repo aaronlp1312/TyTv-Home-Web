@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
+
+import 'package:flauncher/browser_favorites.dart';
 
 class BrowserScreen extends StatefulWidget {
   final String? initialUrl;
@@ -15,13 +18,44 @@ class _BrowserScreenState extends State<BrowserScreen> {
   final TextEditingController _urlController = TextEditingController();
   bool _isLoading = true;
 
+  String? _currentTitle;
+  String? _currentFavicon;
+
   @override
   void initState() {
     super.initState();
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(NavigationDelegate(
-        onPageFinished: (_) => setState(() => _isLoading = false),
+        onPageFinished: (url) async {
+          setState(() => _isLoading = false);
+          // try to extract page title and favicon
+          try {
+            final titleResult = await _controller.runJavaScriptReturningResult('document.title');
+            if (titleResult != null) {
+              // the returned value may be a quoted string or plain
+              final t = titleResult.toString().replaceAll('"', '');
+              setState(() => _currentTitle = t);
+            }
+          } catch (_) {}
+
+          try {
+            final favResult = await _controller.runJavaScriptReturningResult("(function(){var i=document.querySelector('link[rel~\\\"icon\\\"], link[rel=\\\"shortcut icon\\\"], link[rel=\\\"apple-touch-icon\\\"]'); if(i) return i.href; return '';})()");
+            if (favResult != null) {
+              final f = favResult.toString().replaceAll('"', '');
+              if (f.isNotEmpty) setState(() => _currentFavicon = f);
+            }
+          } catch (_) {}
+
+          // Save the finished URL into recents
+          try {
+            final current = await _controller.currentUrl();
+            if (current != null && current.isNotEmpty) {
+              BrowserFavorites.addRecent(current);
+            }
+          } catch (_) {}
+        },
+        onPageStarted: (_) => setState(() => _isLoading = true),
       ));
 
     final startUrl = widget.initialUrl ?? 'https://www.google.com';
@@ -45,6 +79,24 @@ class _BrowserScreenState extends State<BrowserScreen> {
     _saveRecent(target);
   }
 
+  Future<void> _pinCurrentPage() async {
+    try {
+      final current = await _controller.currentUrl();
+      if (current == null || current.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No page to pin')));
+        return;
+      }
+      final title = _currentTitle ?? current;
+      final favicon = _currentFavicon ?? '';
+      final item = PinnedItem(url: current, title: title, favicon: favicon);
+      await BrowserFavorites.addPinnedObject(item);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pinned')));
+      // optionally update a global state or notify favorites row; it reads from prefs on build
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Pin failed: $e')));
+    }
+  }
+
   @override
   void dispose() {
     _urlController.dispose();
@@ -53,42 +105,38 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Basic layout: top address bar (focusable), WebView below
     return Scaffold(
       appBar: AppBar(
         title: Focus(
           child: TextField(
             controller: _urlController,
-            style: TextStyle(fontSize: 20),
+            style: const TextStyle(fontSize: 20),
             decoration: InputDecoration(
               hintText: 'Enter URL',
               suffixIcon: IconButton(
-                icon: Icon(Icons.search),
+                icon: const Icon(Icons.search),
                 onPressed: () => _goToUrl(_urlController.text.trim()),
               ),
             ),
             onSubmitted: (v) => _goToUrl(v.trim()),
           ),
-          // D-Pad behavior: Enter will submit; Arrow keys move in/out of webview
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh),
+            icon: const Icon(Icons.push_pin),
+            tooltip: 'Pin this page',
+            onPressed: _pinCurrentPage,
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
             onPressed: () => _controller.reload(),
           ),
           IconButton(
-            icon: Icon(Icons.arrow_back),
+            icon: const Icon(Icons.arrow_back),
             onPressed: () => _controller.goBack(),
           ),
           IconButton(
-  icon: Icon(Icons.web),
-  tooltip: 'Browser',
-  onPressed: () {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => BrowserScreen()));
-  },
-),
-          IconButton(
-            icon: Icon(Icons.arrow_forward),
+            icon: const Icon(Icons.arrow_forward),
             onPressed: () => _controller.goForward(),
           ),
         ],
@@ -96,8 +144,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
       body: Stack(
         children: [
           WebViewWidget(controller: _controller),
-          if (_isLoading)
-            const Center(child: CircularProgressIndicator()),
+          if (_isLoading) const Center(child: CircularProgressIndicator()),
         ],
       ),
     );
