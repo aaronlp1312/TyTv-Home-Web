@@ -54,6 +54,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Basic layout: top address bar (focusable), WebView below
     return Scaffold(
       appBar: AppBar(
         title: Focus(
@@ -69,6 +70,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
             ),
             onSubmitted: (v) => _goToUrl(v.trim()),
           ),
+          // D-Pad behavior: Enter will submit; Arrow keys move in/out of webview
         ),
         actions: [
           IconButton(
@@ -80,6 +82,13 @@ class _BrowserScreenState extends State<BrowserScreen> {
             onPressed: () => _controller.goBack(),
           ),
           IconButton(
+  icon: Icon(Icons.web),
+  tooltip: 'Browser',
+  onPressed: () {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => BrowserScreen()));
+  },
+),
+          IconButton(
             icon: Icon(Icons.arrow_forward),
             onPressed: () => _controller.goForward(),
           ),
@@ -88,7 +97,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
       body: Stack(
         children: [
           WebViewWidget(controller: _controller),
-          if (_isLoading) const Center(child: CircularProgressIndicator()),
+          if (_isLoading)
+            const Center(child: CircularProgressIndicator()),
         ],
       ),
     );
